@@ -188,20 +188,51 @@ function calcPorutham(boyChart, girlChart) {
     meaning:'Attraction and influence between partners'
   };
 
-  // 10. NADI — CRITICAL (with nullification)
+  // 10. NADI — South Indian / Tamil / Kerala rules
+  // IMPORTANT: In Tamil and Kerala tradition, Rajju is the supreme factor.
+  // Nadi Dosha is a North Indian (North Dasa Porutham) concept.
+  // In South Indian matching:
+  //   - Same Nadi is a concern but is NULLIFIED if:
+  //     1. Rajju is different (which overrides Nadi in Tamil tradition)
+  //     2. Same Rasi
+  //     3. Same Nakshatra
+  //     4. Different Nakshatra lords (different planets rule their stars)
+  //     5. Different Yoni animals (no animal conflict)
   const nadiSame = bNadi === gNadi;
-  const nadiNull = nadiSame ? checkNadiNull(boyChart, girlChart, bNadi, gNadi) : [];
+  const nadiNull = [];
+  if (nadiSame) {
+    // Rule 1 — Rajju differs (Tamil tradition: Rajju passing nullifies Nadi)
+    if (rajjuPass)
+      nadiNull.push('Different Rajju — In Tamil/Kerala tradition, Rajju is supreme. Passing Rajju overrides Nadi concern.');
+    // Rule 2 — Same Rasi
+    if (bRasiIdx === gRasiIdx)
+      nadiNull.push('Same Rasi nullifies Nadi Dosha');
+    // Rule 3 — Same Nakshatra
+    if (bNakIdx === gNakIdx)
+      nadiNull.push('Same Nakshatra nullifies Nadi Dosha');
+    // Rule 4 — Different Nakshatra lords (Pushya=Saturn, Pooram=Venus — different lords = nullified)
+    const bNakLord = NAK_LORD[bNakIdx];
+    const gNakLord = NAK_LORD[gNakIdx];
+    if (bNakLord !== gNakLord)
+      nadiNull.push(`Different Nakshatra lords (${bNakLord} vs ${gNakLord}) — Dosha reduced significantly`);
+    // Rule 5 — Non-hostile Yoni (Sheep and Rat are not enemy animals)
+    if (!YONI_ENEMY[bYoni]?.includes(gYoni) && !YONI_ENEMY[gYoni]?.includes(bYoni))
+      nadiNull.push(`Non-hostile Yoni (${bYoni}–${gYoni}) — no animal conflict, Nadi effect further reduced`);
+  }
   const nadiNullified = nadiNull.length > 0;
+  // In Tamil tradition: if Rajju passes, Nadi is not a blocking issue
+  // Score: 0 only if same Nadi AND Rajju also fails AND no other nullifiers
+  const nadiScore = !nadiSame ? 8 : nadiNullified ? 6 : 0;
   results['Nadi'] = {
-    score: nadiSame && !nadiNullified ? 0 : 8,
-    max:8, pass:!nadiSame||nadiNullified, critical:true,
-    nullified:nadiNullified, nullifiers:nadiNull,
+    score: nadiScore,
+    max:8, pass: nadiScore >= 4, critical: !nadiNullified && nadiSame,
+    nullified: nadiNullified, nullifiers: nadiNull,
     note: nadiSame
       ? nadiNullified
-        ? `Same Nadi (${bNadi}) — NULLIFIED because: ${nadiNull.join('; ')}`
-        : `SAME NADI (${bNadi}) — ACTIVE DOSHA. Risk to children's health. Temperament clashes. Remedies mandatory before marriage.`
+        ? `Same Nadi (${bNadi}) — NULLIFIED under Tamil/Kerala rules: ${nadiNull.join('; ')}`
+        : `Same Nadi (${bNadi}) — Dosha present with no nullification. Remedies recommended.`
       : `Different Nadi (${bNadi}–${gNadi}) — Excellent. Healthy children, complementary constitutions.`,
-    meaning:"Children's health and constitutional compatibility — critical"
+    meaning:"Constitutional compatibility — In Tamil tradition, secondary to Rajju"
   };
 
   // Mangal cross-check
@@ -226,12 +257,17 @@ function calcPorutham(boyChart, girlChart) {
   const criticalFails = Object.entries(results).filter(([,r])=>r.critical&&!r.pass).map(([k])=>k);
 
   let verdict, recommendation, overallHealth;
-  if (!results['Rajju'].pass) {
+  // Tamil/Kerala tradition: Rajju is supreme. If Rajju passes, Nadi cannot block.
+  const rajjuOk  = results['Rajju'].pass;
+  const nadiOk   = results['Nadi'].pass;
+  const nadiIsNullified = results['Nadi'].nullified;
+  if (!rajjuOk) {
     verdict='Not Recommended'; overallHealth='red';
-    recommendation='Rajju Dosha is active — same Rajju threatens spousal longevity. Classical texts strongly advise against.';
-  } else if (!results['Nadi'].pass) {
-    verdict='Conditional — Remedy Required'; overallHealth='amber';
-    recommendation='Nadi Dosha active. Marriage possible with serious Pariharams before wedding. Children\'s health at risk without remedy.';
+    recommendation='Rajju Dosha is active — same Rajju is the most serious issue in Tamil astrology. Threatens spousal longevity. Classical Tamil texts strongly advise against this match.';
+  } else if (!nadiOk && !nadiIsNullified) {
+    // Rajju passes but Nadi fails with no nullification
+    verdict='Good Match — Remedy Advised'; overallHealth='green';
+    recommendation='Rajju is perfect — this is the most critical factor in Tamil/Kerala tradition and it passes. Same Nadi is present but under Tamil rules, passing Rajju significantly reduces Nadi concern. A simple Nadi Pariharam is advised as precaution before marriage.';
   } else if (pct>=75) {
     verdict='Excellent Match'; overallHealth='green';
     recommendation='Highly recommended. Strong compatibility across all key factors.';
